@@ -10,7 +10,7 @@ from subliminal.providers.opensubtitles import OpenSubtitlesProvider as _OpenSub
     OpenSubtitlesSubtitle as _OpenSubtitlesSubtitle, Episode, ServerProxy, Unauthorized, NoSession, \
     DownloadLimitReached, InvalidImdbid, UnknownUserAgent, DisabledUserAgent, OpenSubtitlesError
 from mixins import ProviderRetryMixin
-from subliminal_patch.http import TimeoutSafeTransport, TimeoutTransport
+from subliminal_patch.http import SubZeroTransport, HTTPSProxyTransport, RequestsTransport
 from subliminal.cache import region
 from subzero.language import Language
 
@@ -73,9 +73,10 @@ class OpenSubtitlesProvider(ProviderRetryMixin, _OpenSubtitlesProvider):
     hearing_impaired_verifiable = True
     skip_wrong_fps = True
     is_vip = False
+    use_https = True
 
-    default_url = "https://api.opensubtitles.org/xml-rpc"
-    vip_url = "https://vip-api.opensubtitles.org/xml-rpc"
+    default_url = "%s://api.opensubtitles.org/xml-rpc"
+    vip_url = "%s://vip-api.opensubtitles.org/xml-rpc"
 
     languages = {Language.fromopensubtitles(l) for l in language_converters['szopensubtitles'].codes}# | {
         #Language.fromietf("sr-latn"), Language.fromietf("sr-cyrl")}
@@ -92,6 +93,7 @@ class OpenSubtitlesProvider(ProviderRetryMixin, _OpenSubtitlesProvider):
         self.skip_wrong_fps = skip_wrong_fps
         self.token = None
         self.is_vip = is_vip
+        #self.use_https = os.environ.get("SZ_USE_HTTPS", "True") == "True"
 
         if is_vip:
             self.server = self.get_server_proxy(self.vip_url)
@@ -106,8 +108,10 @@ class OpenSubtitlesProvider(ProviderRetryMixin, _OpenSubtitlesProvider):
             logger.info("Only searching for foreign/forced subtitles")
 
     def get_server_proxy(self, url, timeout=10):
-        transport = TimeoutSafeTransport if url.startswith("https") else TimeoutTransport
-        return ServerProxy(url, transport(timeout))
+        url = url % ("https" if self.use_https else "http")
+        logger.exception("GIGI %s", url)
+        return ServerProxy(url, RequestsTransport({"https": os.environ.get("SZ_HTTPS_PROXY")}, os.environ.get("SZ_USER_AGENT", "Sub-Zero/2")))
+        return ServerProxy(url, SubZeroTransport(timeout, url))
 
     def log_in(self, server_url=None):
         if server_url:
