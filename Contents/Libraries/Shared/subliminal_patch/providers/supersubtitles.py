@@ -131,7 +131,7 @@ class SuperSubtitlesSubtitle(Subtitle):
         if video.format and self.version and video.format.lower() in self.version.lower():
             matches.add('format')
         # other properties
-        # matches |= guess_matches(video, guessit(self.release_info.encode("utf-8")))
+        matches |= guess_matches(video, guessit(self.release_info.encode("utf-8")))
 
         self.matches = matches
         return matches
